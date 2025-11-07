@@ -12,9 +12,17 @@ public extension MTLDevice {
             #if targetEnvironment(macCatalyst)
             return self.supportsFamily(.common3)
             #elseif os(iOS)
-            return self.supportsFeatureSet(.iOS_GPUFamily4_v1)
+            if #available(iOS 13.0, *) {
+                return self.supportsFamily(.apple4)
+            } else {
+                return self.supportsFeatureSet(.iOS_GPUFamily4_v1)
+            }
             #elseif os(macOS)
-            return self.supportsFeatureSet(.macOS_GPUFamily1_v3)
+            if #available(macOS 13.0, *) {
+                return self.supportsFamily(.mac2)
+            } else {
+                return self.supportsFeatureSet(.macOS_GPUFamily1_v3)
+            }
             #endif
             
         case let .readWriteTextures(pixelFormat):

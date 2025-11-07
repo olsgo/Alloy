@@ -7,10 +7,10 @@ public final class ComputeCommand {
     
     public let pipelineState: MTLComputePipelineState
     
-    fileprivate let threadgroupMemoryArguments: [String: MTLArgument]
-    fileprivate let samplerArguments: [String: MTLArgument]
-    fileprivate let textureArguments: [String: MTLArgument]
-    fileprivate let bufferArguments: [String: MTLArgument]
+    fileprivate let threadgroupMemoryArguments: [String: Int]
+    fileprivate let samplerArguments: [String: Int]
+    fileprivate let textureArguments: [String: Int]
+    fileprivate let bufferArguments: [String: Int]
     
     // MARK: Threadgroup Memory Lengths values
     fileprivate var threadgroupMemoryLengths: [String: Int] = [:]
@@ -41,14 +41,25 @@ public final class ComputeCommand {
         }
         
         var reflection: MTLAutoreleasedComputePipelineReflection? = nil
-        self.pipelineState = try library.device.makeComputePipelineState(function: function,
-                                                                         options: .argumentInfo,
-                                                                         reflection: &reflection)
-        
-        self.samplerArguments = reflection!.arguments.filter { $0.type == .sampler }.toDictionary { $0.name }
-        self.textureArguments = reflection!.arguments.filter { $0.type == .texture }.toDictionary { $0.name }
-        self.bufferArguments = reflection!.arguments.filter { $0.type == .buffer }.toDictionary { $0.name }
-        self.threadgroupMemoryArguments = reflection!.arguments.filter { $0.type == .threadgroupMemory }.toDictionary { $0.name }
+
+        let pipelineOptions: MTLPipelineOption
+        if #available(macOS 13.0, iOS 16.0, tvOS 16.0, *) {
+            pipelineOptions = .bindingInfo
+        } else {
+            pipelineOptions = .argumentInfo
+        }
+
+        self.pipelineState = try library.device.makeComputePipelineState(
+            function: function,
+            options: pipelineOptions,
+            reflection: &reflection
+        )
+
+        let bindings = ComputeCommand.makeBindings(from: reflection)
+        self.samplerArguments = bindings.samplers
+        self.textureArguments = bindings.textures
+        self.bufferArguments = bindings.buffers
+        self.threadgroupMemoryArguments = bindings.threadgroupMemory
     }
     
     public subscript(dynamicMember input: String) -> MTLBuffer? {
@@ -123,40 +134,40 @@ public final class ComputeCommand {
     }
     
     fileprivate func setup(using encoder: MTLComputeCommandEncoder) {
-        for (name, argument) in textureArguments {
+        for (name, index) in textureArguments {
             guard let texture = self.textureValues[name] else {
                 fatalError("\(#function): Missing texture value for \(name) argument")
             }
             
-            encoder.setTexture(texture, index: argument.index)
+            encoder.setTexture(texture, index: index)
         }
 
-        for (name, argument) in self.samplerArguments {
+        for (name, index) in self.samplerArguments {
             guard let sampler = self.samplerValues[name] else {
-                 fatalError("\(#function): Missing sampler value for \(name) argument")
+                fatalError("\(#function): Missing sampler value for \(name) argument")
             }
 
-            encoder.setSamplerState(sampler, index: argument.index)
+            encoder.setSamplerState(sampler, index: index)
         }
         
-        for (name, argument) in bufferArguments {
+        for (name, index) in bufferArguments {
             guard let buffer = self.bufferValues[name] else {
                 fatalError("\(#function): Missing buffer value for \(name) argument")
             }
             
             let offset = self.bufferOffsetValues[name] ?? 0
             
-            encoder.setBuffer(buffer, offset: offset, index: argument.index)
+            encoder.setBuffer(buffer, offset: offset, index: index)
         }
         
-        for (name, argument) in threadgroupMemoryArguments {
+        for (name, index) in threadgroupMemoryArguments {
             let length = self.threadgroupMemoryLengths[name] ?? 0
             if length <= 0 {
                 print("\(#function): WARNING: Missing correct value for threadgroup memory argument \(name). Current value is \(length).")
                 continue
             }
             
-            encoder.setThreadgroupMemoryLength(length, index: argument.index)
+            encoder.setThreadgroupMemoryLength(length, index: index)
         }
     }
     
@@ -174,7 +185,61 @@ public final class ComputeCommand {
         encoder.dispatchThreads(gridInfo.gridSize,
                                 threadsPerThreadgroup: gridInfo.groupSize)
     }
-    
+
     fileprivate static let bufferOffsetPostFix = "Offset"
     fileprivate static let threadgroupMemoryLengthPostFix = "MemoryLength"
+
+    private static func makeBindings(
+        from reflection: MTLComputePipelineReflection?
+    ) -> (
+        samplers: [String: Int],
+        textures: [String: Int],
+        buffers: [String: Int],
+        threadgroupMemory: [String: Int]
+    ) {
+        var samplerBindings: [String: Int] = [:]
+        var textureBindings: [String: Int] = [:]
+        var bufferBindings: [String: Int] = [:]
+        var threadgroupBindings: [String: Int] = [:]
+
+        if #available(macOS 13.0, iOS 16.0, tvOS 16.0, *) {
+            let bindings = reflection?.bindings ?? []
+            for binding in bindings {
+                switch binding.type {
+                case .sampler:
+                    samplerBindings[binding.name] = binding.index
+                case .texture:
+                    textureBindings[binding.name] = binding.index
+                case .buffer:
+                    bufferBindings[binding.name] = binding.index
+                case .threadgroupMemory:
+                    threadgroupBindings[binding.name] = binding.index
+                default:
+                    continue
+                }
+            }
+        } else if let arguments = reflection?.arguments {
+            for argument in arguments {
+                switch argument.type {
+                case .sampler:
+                    samplerBindings[argument.name] = argument.index
+                case .texture:
+                    textureBindings[argument.name] = argument.index
+                case .buffer:
+                    bufferBindings[argument.name] = argument.index
+                case .threadgroupMemory:
+                    threadgroupBindings[argument.name] = argument.index
+                default:
+                    continue
+                }
+            }
+        }
+
+        return (
+            samplers: samplerBindings,
+            textures: textureBindings,
+            buffers: bufferBindings,
+            threadgroupMemory: threadgroupBindings
+        )
+    }
 }

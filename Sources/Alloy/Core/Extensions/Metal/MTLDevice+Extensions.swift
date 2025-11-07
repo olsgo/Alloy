@@ -58,21 +58,28 @@ public extension MTLDevice {
 
     func buffer<T>(with value: T,
                    options: MTLResourceOptions) throws -> MTLBuffer {
-        var value = value
-        guard let buffer = self.makeBuffer(bytes: &value,
-                                           length: MemoryLayout<T>.stride,
-                                           options: options)
-        else { throw MetalError.MTLDeviceError.bufferCreationFailed }
-        return buffer
+        return try withUnsafeBytes(of: value) { rawBuffer -> MTLBuffer in
+            guard let baseAddress = rawBuffer.baseAddress,
+                  let buffer = self.makeBuffer(bytes: baseAddress,
+                                                length: rawBuffer.count,
+                                                options: options) else {
+                throw MetalError.MTLDeviceError.bufferCreationFailed
+            }
+            return buffer
+        }
     }
 
     func buffer<T>(with values: [T],
                    options: MTLResourceOptions) throws -> MTLBuffer {
-        guard let buffer = self.makeBuffer(bytes: values,
-                                           length: MemoryLayout<T>.stride * values.count,
-                                           options: options)
-        else { throw MetalError.MTLDeviceError.bufferCreationFailed }
-        return buffer
+        return try values.withUnsafeBytes { rawBuffer -> MTLBuffer in
+            guard let baseAddress = rawBuffer.baseAddress,
+                  let buffer = self.makeBuffer(bytes: baseAddress,
+                                                length: rawBuffer.count,
+                                                options: options) else {
+                throw MetalError.MTLDeviceError.bufferCreationFailed
+            }
+            return buffer
+        }
     }
 
     func depthBuffer(width: Int, height: Int,

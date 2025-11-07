@@ -1,3 +1,4 @@
+import Foundation
 import Metal
 import MetalKit
 
@@ -37,8 +38,12 @@ public final class MTLContext {
                 library = device.makeDefaultLibrary()
             }
         } else {
-            library = try device.makeLibrary(filepath: bundle.path(forResource: name!,
-                                                                    ofType: "metallib")!)
+            let path = bundle.path(forResource: name!, ofType: "metallib")!
+            if #available(macOS 13.0, iOS 16.0, tvOS 16.0, *) {
+                library = try device.makeLibrary(URL: URL(fileURLWithPath: path))
+            } else {
+                library = try device.makeLibrary(filepath: path)
+            }
         }
 
         self.init(commandQueue: commandQueue)
@@ -106,4 +111,3 @@ public final class MTLContext {
     }
 
 }
-

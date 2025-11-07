@@ -3,13 +3,21 @@ import Metal
 public extension MTLComputeCommandEncoder {
     
     func setValue<T>(_ value: T, at index: Int) {
-        var t = value
-        self.setBytes(&t, length: MemoryLayout<T>.stride, index: index)
+        withUnsafeBytes(of: value) { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress else { return }
+            self.setBytes(baseAddress,
+                          length: rawBuffer.count,
+                          index: index)
+        }
     }
     
     func setValue<T>(_ value: [T], at index: Int) {
-        var t = value
-        self.setBytes(&t, length: MemoryLayout<T>.stride * value.count, index: index)
+        value.withUnsafeBytes { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress else { return }
+            self.setBytes(baseAddress,
+                          length: rawBuffer.count,
+                          index: index)
+        }
     }
     
     func setTextures(_ textures: [MTLTexture?], startingAt startIndex: Int = 0) {

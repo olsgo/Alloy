@@ -323,13 +323,18 @@ public extension MTLTexture {
         let bytesPerRow = width
                         * featureChannels
                         * MemoryLayout<T>.stride
-        self.getBytes(&bytes,
-                      bytesPerRow: bytesPerRow,
-                      from: .init(origin: .zero,
-                                  size: .init(width: width,
-                                              height: height,
-                                              depth: 1)),
-                      mipmapLevel: 0)
+        bytes.withUnsafeMutableBytes { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress else { return }
+            self.getBytes(
+                baseAddress,
+                bytesPerRow: bytesPerRow,
+                from: .init(
+                    origin: .zero,
+                    size: .init(width: width, height: height, depth: 1)
+                ),
+                mipmapLevel: 0
+            )
+        }
         return bytes
     }
 }
@@ -344,8 +349,15 @@ public extension MTLTexture {
         
         let targetRegion = region ?? self.region
         let bytesPerRow = MemoryLayout<T>.stride * targetRegion.size.width * self.sampleCount
-        var bytes = [T](repeating: value, count: self.sampleCount * targetRegion.size.width * targetRegion.size.height)
-
-        self.replace(region: targetRegion, mipmapLevel: 0, withBytes: &bytes, bytesPerRow: bytesPerRow)
+        let bytes = [T](repeating: value, count: self.sampleCount * targetRegion.size.width * targetRegion.size.height)
+        bytes.withUnsafeBytes { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress else { return }
+            self.replace(
+                region: targetRegion,
+                mipmapLevel: 0,
+                withBytes: baseAddress,
+                bytesPerRow: bytesPerRow
+            )
+        }
     }
 }

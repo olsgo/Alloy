@@ -16,7 +16,7 @@ internal class MTLTextureDescriptorCodableBox: Codable {
     }
 }
 
-extension MTLTextureDescriptor: Encodable {
+extension MTLTextureDescriptor: @retroactive Encodable {
 
     internal enum CodingKeys: String, CodingKey {
         case width

@@ -1,3 +1,4 @@
+import Foundation
 import Metal
 
 public extension MTLContext {
@@ -199,7 +200,7 @@ public extension MTLContext {
     func buffer(bytesNoCopy pointer: UnsafeMutableRawPointer,
                 length: Int,
                 options: MTLResourceOptions = [],
-                deallocator: ((UnsafeMutableRawPointer, Int) -> Void)? = nil) -> MTLBuffer? {
+                deallocator: (@Sendable (UnsafeMutableRawPointer, Int) -> Void)? = nil) -> MTLBuffer? {
         return self.device
                    .makeBuffer(bytesNoCopy: pointer,
                                length: length,
@@ -258,8 +259,13 @@ public extension MTLContext {
     }
 
     func library(filepath: String) throws -> MTLLibrary {
-        return try self.device
-                       .makeLibrary(filepath: filepath)
+        if #available(macOS 13.0, iOS 16.0, tvOS 16.0, *) {
+            return try self.device
+                           .makeLibrary(URL: URL(fileURLWithPath: filepath))
+        } else {
+            return try self.device
+                           .makeLibrary(filepath: filepath)
+        }
     }
 
     func library(URL url: URL) throws -> MTLLibrary {
@@ -281,7 +287,7 @@ public extension MTLContext {
 
     func library(source: String,
                  options: MTLCompileOptions?,
-                 completionHandler: @escaping MTLNewLibraryCompletionHandler) {
+                 completionHandler: @escaping @Sendable (MTLLibrary?, Error?) -> Void) {
         return self.device
                    .makeLibrary(source: source,
                                 options: options,
@@ -303,7 +309,7 @@ public extension MTLContext {
     }
 
     func renderPipelineState(descriptor: MTLRenderPipelineDescriptor,
-                             completionHandler: @escaping MTLNewRenderPipelineStateCompletionHandler) {
+                             completionHandler: @escaping @Sendable (MTLRenderPipelineState?, Error?) -> Void) {
         return self.device
                    .makeRenderPipelineState(descriptor: descriptor,
                                             completionHandler: completionHandler)
@@ -311,7 +317,7 @@ public extension MTLContext {
 
     func renderPipelineState(descriptor: MTLRenderPipelineDescriptor,
                              options: MTLPipelineOption,
-                             completionHandler: @escaping MTLNewRenderPipelineStateWithReflectionCompletionHandler) {
+                             completionHandler: @escaping @Sendable (MTLRenderPipelineState?, MTLRenderPipelineReflection?, Error?) -> Void) {
         return self.device
                    .makeRenderPipelineState(descriptor: descriptor,
                                             options: options,
@@ -333,7 +339,7 @@ public extension MTLContext {
     }
 
     func computePipelineState(function computeFunction: MTLFunction,
-                              completionHandler: @escaping MTLNewComputePipelineStateCompletionHandler) {
+                              completionHandler: @escaping @Sendable (MTLComputePipelineState?, Error?) -> Void) {
         return self.device
                    .makeComputePipelineState(function: computeFunction,
                                              completionHandler: completionHandler)
@@ -341,7 +347,7 @@ public extension MTLContext {
 
     func computePipelineState(function computeFunction: MTLFunction,
                               options: MTLPipelineOption,
-                              completionHandler: @escaping MTLNewComputePipelineStateWithReflectionCompletionHandler) {
+                              completionHandler: @escaping @Sendable (MTLComputePipelineState?, MTLComputePipelineReflection?, Error?) -> Void) {
         return self.device
                    .makeComputePipelineState(function: computeFunction,
                                              options: options,
@@ -359,7 +365,7 @@ public extension MTLContext {
 
     func computePipelineState(descriptor: MTLComputePipelineDescriptor,
                               options: MTLPipelineOption,
-                              completionHandler: @escaping MTLNewComputePipelineStateWithReflectionCompletionHandler) {
+                              completionHandler: @escaping @Sendable (MTLComputePipelineState?, MTLComputePipelineReflection?, Error?) -> Void) {
         self.device
             .makeComputePipelineState(descriptor: descriptor,
                                       options: options,
@@ -373,9 +379,15 @@ public extension MTLContext {
         return fence
     }
 
+    @available(macOS, deprecated: 13.0, message: "Use supportsFamily instead")
+    @available(iOS, deprecated: 16.0, message: "Use supportsFamily instead")
+    @available(tvOS, deprecated: 16.0, message: "Use supportsFamily instead")
     func supportsFeatureSet(_ featureSet: MTLFeatureSet) -> Bool {
-        return self.device
-                   .supportsFeatureSet(featureSet)
+        if #available(macOS 13.0, iOS 16.0, tvOS 16.0, *) {
+            return self.invokeSupportsFeatureSetDynamically(featureSet)
+        } else {
+            return self.device.supportsFeatureSet(featureSet)
+        }
     }
 
     @available(iOS 13.0, macOS 10.15, *)
@@ -400,6 +412,22 @@ public extension MTLContext {
                    .minimumTextureBufferAlignment(for: format)
     }
 
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, *)
+    @available(macOS, deprecated: 13.0, message: "Use supportsFamily instead")
+    @available(iOS, deprecated: 16.0, message: "Use supportsFamily instead")
+    @available(tvOS, deprecated: 16.0, message: "Use supportsFamily instead")
+    private func invokeSupportsFeatureSetDynamically(_ featureSet: MTLFeatureSet) -> Bool {
+        let selector = NSSelectorFromString("supportsFeatureSet:")
+        guard let nsDevice = self.device as? NSObject,
+              nsDevice.responds(to: selector),
+              let implementation = nsDevice.method(for: selector) else {
+            return false
+        }
+        typealias SupportsFeatureSetIMP = @convention(c) (AnyObject, Selector, MTLFeatureSet) -> Bool
+        let function = unsafeBitCast(implementation, to: SupportsFeatureSetIMP.self)
+        return function(nsDevice as AnyObject, selector, featureSet)
+    }
+
     #if os(iOS) && !targetEnvironment(macCatalyst)
     @available(macOS, unavailable)
     @available(macCatalyst, unavailable)
@@ -416,7 +444,7 @@ public extension MTLContext {
     @available(macCatalyst, unavailable)
     func renderPipelineState(tileDescriptor descriptor: MTLTileRenderPipelineDescriptor,
                              options: MTLPipelineOption,
-                             completionHandler: @escaping MTLNewRenderPipelineStateWithReflectionCompletionHandler) {
+                             completionHandler: @escaping @Sendable (MTLRenderPipelineState?, MTLRenderPipelineReflection?, Error?) -> Void) {
         self.device
             .makeRenderPipelineState(tileDescriptor: descriptor,
                                      options: options,

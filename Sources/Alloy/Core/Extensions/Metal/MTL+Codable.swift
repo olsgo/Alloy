@@ -1,11 +1,11 @@
 import Metal
 
-extension MTLCPUCacheMode: Codable {}
-extension MTLTextureUsage: Codable {}
-extension MTLTextureType: Codable {}
-extension MTLPixelFormat: Codable {}
+extension MTLCPUCacheMode: @retroactive Codable {}
+extension MTLTextureUsage: @retroactive Codable {}
+extension MTLTextureType: @retroactive Codable {}
+extension MTLPixelFormat: @retroactive Codable {}
 
-extension MTLOrigin: Codable {
+extension MTLOrigin: @retroactive Codable {
     private enum CodingKeys: String, CodingKey {
         case x, y, z
     }
@@ -27,7 +27,7 @@ extension MTLOrigin: Codable {
     }
 }
 
-extension MTLSize: Codable {
+extension MTLSize: @retroactive Codable {
     private enum CodingKeys: String, CodingKey {
         case width, height, depth
     }
@@ -49,7 +49,7 @@ extension MTLSize: Codable {
     }
 }
 
-extension MTLRegion: Codable {
+extension MTLRegion: @retroactive Codable {
     private enum CodingKeys: String, CodingKey {
         case origin, size
     }

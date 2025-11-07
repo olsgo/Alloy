@@ -49,13 +49,21 @@ public extension MPSImage {
         let region = MTLRegion(origin: MTLOrigin(x: 0, y: 0, z: 0),
                                size: MTLSize(width: self.width, height: self.height, depth: 1))
 
-        for i in 0 ..< numSlices * self.numberOfImages {
-            self.texture.getBytes(&(output[self.width * self.height * numComponents * i]),
-                                  bytesPerRow: self.width * numComponents * MemoryLayout<T>.self.size,
-                                  bytesPerImage: 0,
-                                  from: region,
-                                  mipmapLevel: 0,
-                                  slice: i)
+        let bytesPerRow = self.width * numComponents * MemoryLayout<T>.stride
+        let elementsPerSlice = self.width * self.height * numComponents
+        output.withUnsafeMutableBytes { rawBuffer in
+            guard let baseAddress = rawBuffer.bindMemory(to: T.self).baseAddress else { return }
+            for i in 0 ..< numSlices * self.numberOfImages {
+                let slicePointer = baseAddress.advanced(by: elementsPerSlice * i)
+                self.texture.getBytes(
+                    slicePointer,
+                    bytesPerRow: bytesPerRow,
+                    bytesPerImage: 0,
+                    from: region,
+                    mipmapLevel: 0,
+                    slice: i
+                )
+            }
         }
         return output
     }
