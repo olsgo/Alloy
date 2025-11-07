@@ -7,18 +7,23 @@ public extension MTLFunctionConstantValues {
     func set<T>(_ value: T,
                 type: MTLDataType,
                 at index: Int) {
-        var t = value
-        self.setConstantValue(&t,
-                              type: type,
-                              index: index)
+        withUnsafeBytes(of: value) { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress else { return }
+            self.setConstantValue(baseAddress,
+                                  type: type,
+                                  index: index)
+        }
     }
 
     func set<T>(_ values: [T],
                 type: MTLDataType,
                 startingAt startIndex: Int = 0) {
-        self.setConstantValues(values,
-                               type: type,
-                               range: startIndex ..< (startIndex + values.count))
+        values.withUnsafeBytes { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress else { return }
+            self.setConstantValues(baseAddress,
+                                   type: type,
+                                   range: startIndex ..< (startIndex + values.count))
+        }
     }
 
     // MARK: - Bool

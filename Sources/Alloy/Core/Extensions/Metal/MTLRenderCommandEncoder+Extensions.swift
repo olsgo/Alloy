@@ -3,23 +3,39 @@ import Metal
 public extension MTLRenderCommandEncoder {
     
     func setVertexValue<T>(_ value: T, at index: Int) {
-        var t = value
-        self.setVertexBytes(&t, length: MemoryLayout<T>.stride, index: index)
+        withUnsafeBytes(of: value) { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress else { return }
+            self.setVertexBytes(baseAddress,
+                                length: rawBuffer.count,
+                                index: index)
+        }
     }
     
     func setVertexValue<T>(_ value: [T], at index: Int) {
-        var t = value
-        self.setVertexBytes(&t, length: MemoryLayout<T>.stride * value.count, index: index)
+        value.withUnsafeBytes { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress else { return }
+            self.setVertexBytes(baseAddress,
+                                length: rawBuffer.count,
+                                index: index)
+        }
     }
     
     func setFragmentValue<T>(_ value: T, at index: Int) {
-        var t = value
-        self.setFragmentBytes(&t, length: MemoryLayout<T>.stride, index: index)
+        withUnsafeBytes(of: value) { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress else { return }
+            self.setFragmentBytes(baseAddress,
+                                  length: rawBuffer.count,
+                                  index: index)
+        }
     }
     
     func setFragmentValue<T>(_ value: [T], at index: Int) {
-        var t = value
-        self.setFragmentBytes(&t, length: MemoryLayout<T>.stride * value.count, index: index)
+        value.withUnsafeBytes { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress else { return }
+            self.setFragmentBytes(baseAddress,
+                                  length: rawBuffer.count,
+                                  index: index)
+        }
     }
     
     func setVertexTextures(_ textures: [MTLTexture?], startingAt startIndex: Int = 0) {

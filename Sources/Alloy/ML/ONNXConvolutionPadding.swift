@@ -7,7 +7,7 @@ public typealias Pads = (top: Int, left: Int, bottom: Int, right: Int)
 public typealias Padding = (height: Int, width: Int)
 public typealias Scales = (height: Int, width: Int)
 
-@objc(ONNXConvolutionPadding) public class ONNXConvolutionPadding: NSObject, MPSNNPadding {
+@objc(ONNXConvolutionPadding) public class ONNXConvolutionPadding: NSObject, NSSecureCoding, MPSNNPadding {
     public let kernel: Kernel
     public let dilations: Dilations
     public let strides: Strides
@@ -29,21 +29,69 @@ public typealias Scales = (height: Int, width: Int)
         self.isTranspose = isTranspose
     }
 
+    private enum CodingKeys {
+        static let kernelHeight = "kernelHeight"
+        static let kernelWidth = "kernelWidth"
+        static let strideHeight = "strideHeight"
+        static let strideWidth = "strideWidth"
+        static let dilationHeight = "dilationHeight"
+        static let dilationWidth = "dilationWidth"
+        static let padTop = "padTop"
+        static let padLeft = "padLeft"
+        static let padBottom = "padBottom"
+        static let padRight = "padRight"
+        static let outputPaddingHeight = "outputPaddingHeight"
+        static let outputPaddingWidth = "outputPaddingWidth"
+        static let isTranspose = "isTranspose"
+    }
+
     required convenience public init?(coder aDecoder: NSCoder) {
-        guard
-            let data = aDecoder.decodeData(),
-            let other = NSKeyedUnarchiver.unarchiveObject(with: data) as? ONNXConvolutionPadding
-        else { return nil }
-        self.init(kernel: other.kernel,
-                  strides: other.strides,
-                  dilations: other.dilations,
-                  pads: other.pads,
-                  outputPadding: other.outputPadding,
-                  isTranspose: other.isTranspose)
+        let kernel: Kernel = (
+            height: aDecoder.decodeInteger(forKey: CodingKeys.kernelHeight),
+            width: aDecoder.decodeInteger(forKey: CodingKeys.kernelWidth)
+        )
+        let strides: Strides = (
+            height: aDecoder.decodeInteger(forKey: CodingKeys.strideHeight),
+            width: aDecoder.decodeInteger(forKey: CodingKeys.strideWidth)
+        )
+        let dilations: Dilations = (
+            height: aDecoder.decodeInteger(forKey: CodingKeys.dilationHeight),
+            width: aDecoder.decodeInteger(forKey: CodingKeys.dilationWidth)
+        )
+        let pads: Pads = (
+            top: aDecoder.decodeInteger(forKey: CodingKeys.padTop),
+            left: aDecoder.decodeInteger(forKey: CodingKeys.padLeft),
+            bottom: aDecoder.decodeInteger(forKey: CodingKeys.padBottom),
+            right: aDecoder.decodeInteger(forKey: CodingKeys.padRight)
+        )
+        let outputPadding: Padding = (
+            height: aDecoder.decodeInteger(forKey: CodingKeys.outputPaddingHeight),
+            width: aDecoder.decodeInteger(forKey: CodingKeys.outputPaddingWidth)
+        )
+        let isTranspose = aDecoder.decodeBool(forKey: CodingKeys.isTranspose)
+
+        self.init(kernel: kernel,
+                  strides: strides,
+                  dilations: dilations,
+                  pads: pads,
+                  outputPadding: outputPadding,
+                  isTranspose: isTranspose)
     }
 
     public func encode(with aCoder: NSCoder) {
-        aCoder.encode(NSKeyedArchiver.archivedData(withRootObject: self))
+        aCoder.encode(self.kernel.height, forKey: CodingKeys.kernelHeight)
+        aCoder.encode(self.kernel.width, forKey: CodingKeys.kernelWidth)
+        aCoder.encode(self.strides.height, forKey: CodingKeys.strideHeight)
+        aCoder.encode(self.strides.width, forKey: CodingKeys.strideWidth)
+        aCoder.encode(self.dilations.height, forKey: CodingKeys.dilationHeight)
+        aCoder.encode(self.dilations.width, forKey: CodingKeys.dilationWidth)
+        aCoder.encode(self.pads.top, forKey: CodingKeys.padTop)
+        aCoder.encode(self.pads.left, forKey: CodingKeys.padLeft)
+        aCoder.encode(self.pads.bottom, forKey: CodingKeys.padBottom)
+        aCoder.encode(self.pads.right, forKey: CodingKeys.padRight)
+        aCoder.encode(self.outputPadding.height, forKey: CodingKeys.outputPaddingHeight)
+        aCoder.encode(self.outputPadding.width, forKey: CodingKeys.outputPaddingWidth)
+        aCoder.encode(self.isTranspose, forKey: CodingKeys.isTranspose)
     }
 
     public func paddingMethod() -> MPSNNPaddingMethod {
@@ -100,5 +148,5 @@ public typealias Scales = (height: Int, width: Int)
         return (width, height)
     }
 
-    public static var supportsSecureCoding: Bool = true
+    public static var supportsSecureCoding: Bool { true }
 }
